@@ -15,5 +15,5 @@ public class Conta
     [ForeignKey("Usuario")]
     public int UsuarioId { get; set; }
 
-    public Usuario Usuario { get; set; }
+    public Usuario? Usuario { get; set; }
 }

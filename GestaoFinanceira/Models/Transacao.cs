@@ -17,7 +17,7 @@ public class Transacao
     [ForeignKey("Conta")]
     public int ContaId { get; set; }
     
-    public Conta Conta { get; set; }
+    public Conta? Conta { get; set; }
     
     
 }

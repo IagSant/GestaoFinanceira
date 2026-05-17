@@ -2,9 +2,11 @@
 using GestaoFinanceira.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 
 namespace GestaoFinanceira.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class ContaController : ControllerBase
