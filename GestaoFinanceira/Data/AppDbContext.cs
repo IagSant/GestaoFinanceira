@@ -15,4 +15,21 @@ public class AppDbContext : DbContext
     public DbSet<Conta> Contas { get; set; }
 
     public DbSet<Transacao> Transacoes { get; set; }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Usuario>()
+            .Property(u => u.Nome)
+            .HasMaxLength(100);
+
+        modelBuilder.Entity<Usuario>()
+            .Property(u => u.Email)
+            .HasMaxLength(100);
+
+        modelBuilder.Entity<Usuario>()
+            .Property(u => u.Senha)
+            .HasMaxLength(100);
+
+        base.OnModelCreating(modelBuilder);
+    }
 }

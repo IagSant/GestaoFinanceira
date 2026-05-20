@@ -1,4 +1,5 @@
 ﻿using GestaoFinanceira.Data;
+using GestaoFinanceira.DTOs;
 using GestaoFinanceira.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -19,9 +20,18 @@ public class UsuarioController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<Usuario>>> GetUsuarios()
+    public async Task<ActionResult<IEnumerable<UsuarioResponseDTO>>> GetUsuarios()
     {
-        return await _context.Usuarios.ToListAsync();
+        var usuarios = await _context.Usuarios
+            .Select(u => new UsuarioResponseDTO
+            {
+                Id = u.Id,
+                Nome = u.Nome,
+                Email = u.Email
+            })
+            .ToListAsync();
+
+        return Ok(usuarios);
     }
     
     [HttpGet("{id}")]
@@ -38,14 +48,33 @@ public class UsuarioController : ControllerBase
     }
     
     [HttpPost]
-    public async Task<ActionResult<Usuario>> PostUsuario(Usuario usuario)
+    [AllowAnonymous]
+    public async Task<ActionResult> PostUsuario(UsuarioCreateDTO dto)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var usuario = new Usuario
+        {
+            Nome = dto.Nome,
+            Email = dto.Email,
+            Senha = dto.Senha
+        };
+
         _context.Usuarios.Add(usuario);
 
         await _context.SaveChangesAsync();
 
-        return CreatedAtAction(nameof(GetUsuario), new { id = usuario.Id }, usuario);
-        
+        var response = new UsuarioResponseDTO
+        {
+            Id = usuario.Id,
+            Nome = usuario.Nome,
+            Email = usuario.Email
+        };
+
+        return CreatedAtAction(nameof(GetUsuario), new { id = usuario.Id }, response);
     }
     
     [HttpPut("{id}")]
