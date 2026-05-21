@@ -12,9 +12,11 @@ public class Usuario
 
     [Required]
     [EmailAddress]
+    [StringLength(100)]
     public string Email { get; set; }
 
     [Required]
     [MinLength(6)]
+    [StringLength(100)]
     public string Senha { get; set; }
 }

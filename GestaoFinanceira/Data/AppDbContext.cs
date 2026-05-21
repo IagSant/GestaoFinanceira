@@ -29,6 +29,18 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Usuario>()
             .Property(u => u.Senha)
             .HasMaxLength(100);
+        
+        modelBuilder.Entity<Conta>()
+            .Property(c => c.Nome)
+            .HasMaxLength(100);
+        
+        modelBuilder.Entity<Transacao>()
+            .Property(t => t.Descricao)
+            .HasMaxLength(100);
+
+        modelBuilder.Entity<Transacao>()
+            .Property(t => t.Tipo)
+            .HasMaxLength(20);
 
         base.OnModelCreating(modelBuilder);
     }

@@ -1,9 +1,9 @@
 ﻿using GestaoFinanceira.Data;
 using GestaoFinanceira.DTOs;
 using GestaoFinanceira.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Authorization;
 
 namespace GestaoFinanceira.Controllers;
 
@@ -33,20 +33,30 @@ public class UsuarioController : ControllerBase
 
         return Ok(usuarios);
     }
-    
+
     [HttpGet("{id}")]
-    public async Task<ActionResult<Usuario>> GetUsuario(int id)
+    public async Task<ActionResult<UsuarioResponseDTO>> GetUsuario(int id)
     {
         var usuario = await _context.Usuarios.FindAsync(id);
 
         if (usuario == null)
         {
-            return NotFound();
+            return NotFound(new
+            {
+                mensagem = "Usuário não encontrado"
+            });
         }
 
-        return usuario;
+        var response = new UsuarioResponseDTO
+        {
+            Id = usuario.Id,
+            Nome = usuario.Nome,
+            Email = usuario.Email
+        };
+
+        return Ok(response);
     }
-    
+
     [HttpPost]
     [AllowAnonymous]
     public async Task<ActionResult> PostUsuario(UsuarioCreateDTO dto)
@@ -76,22 +86,37 @@ public class UsuarioController : ControllerBase
 
         return CreatedAtAction(nameof(GetUsuario), new { id = usuario.Id }, response);
     }
-    
+
     [HttpPut("{id}")]
-    public async Task<IActionResult> PutUsuario(int id, Usuario usuario)
+    public async Task<IActionResult> PutUsuario(int id, UsuarioCreateDTO dto)
     {
-        if (id != usuario.Id)
+        if (!ModelState.IsValid)
         {
-            return BadRequest();
+            return BadRequest(ModelState);
         }
 
-        _context.Entry(usuario).State = EntityState.Modified;
+        var usuario = await _context.Usuarios.FindAsync(id);
+
+        if (usuario == null)
+        {
+            return NotFound(new
+            {
+                mensagem = "Usuário não encontrado"
+            });
+        }
+
+        usuario.Nome = dto.Nome;
+        usuario.Email = dto.Email;
+        usuario.Senha = dto.Senha;
 
         await _context.SaveChangesAsync();
 
-        return NoContent();
+        return Ok(new
+        {
+            mensagem = "Usuário atualizado com sucesso"
+        });
     }
-    
+
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteUsuario(int id)
     {
@@ -99,13 +124,19 @@ public class UsuarioController : ControllerBase
 
         if (usuario == null)
         {
-            return NotFound();
+            return NotFound(new
+            {
+                mensagem = "Usuário não encontrado"
+            });
         }
 
         _context.Usuarios.Remove(usuario);
 
         await _context.SaveChangesAsync();
 
-        return NoContent();
+        return Ok(new
+        {
+            mensagem = "Usuário removido com sucesso"
+        });
     }
 }

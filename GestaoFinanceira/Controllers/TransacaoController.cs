@@ -1,5 +1,6 @@
 ﻿using GestaoFinanceira.Data;
 using GestaoFinanceira.Models;
+using GestaoFinanceira.DTOs;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
@@ -19,15 +20,27 @@ public class TransacaoController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<Transacao>>> GetTransacoes()
+    public async Task<ActionResult<IEnumerable<TransacaoResponseDTO>>> GetTransacoes()
     {
-        return await _context.Transacoes
+        var transacoes = await _context.Transacoes
             .Include(t => t.Conta)
+            .Select(t => new TransacaoResponseDTO
+            {
+                Id = t.Id,
+                Descricao = t.Descricao,
+                Valor = t.Valor,
+                Tipo = t.Tipo,
+                Data = t.Data,
+                ContaId = t.ContaId,
+                NomeConta = t.Conta.Nome
+            })
             .ToListAsync();
+
+        return Ok(transacoes);
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult<Transacao>> GetTransacao(int id)
+    public async Task<ActionResult<TransacaoResponseDTO>> GetTransacao(int id)
     {
         var transacao = await _context.Transacoes
             .Include(t => t.Conta)
@@ -35,19 +48,52 @@ public class TransacaoController : ControllerBase
 
         if (transacao == null)
         {
-            return NotFound();
+            return NotFound(new
+            {
+                mensagem = "Transação não encontrada"
+            });
         }
 
-        return transacao;
+        var response = new TransacaoResponseDTO
+        {
+            Id = transacao.Id,
+            Descricao = transacao.Descricao,
+            Valor = transacao.Valor,
+            Tipo = transacao.Tipo,
+            Data = transacao.Data,
+            ContaId = transacao.ContaId,
+            NomeConta = transacao.Conta.Nome
+        };
+
+        return Ok(response);
     }
 
     [HttpPost]
-    public async Task<ActionResult<Transacao>> PostTransacao(Transacao transacao)
+    public async Task<ActionResult> PostTransacao(TransacaoCreateDTO dto)
     {
-        var conta = await _context.Contas.FindAsync(transacao.ContaId);
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var conta = await _context.Contas.FindAsync(dto.ContaId);
 
         if (conta == null)
-            return BadRequest("Conta não encontrada.");
+        {
+            return BadRequest(new
+            {
+                mensagem = "Conta não encontrada"
+            });
+        }
+
+        var transacao = new Transacao
+        {
+            Descricao = dto.Descricao,
+            Valor = dto.Valor,
+            Tipo = dto.Tipo,
+            Data = dto.Data,
+            ContaId = dto.ContaId
+        };
 
         if (transacao.Tipo == "credito")
             conta.Saldo += transacao.Valor;
@@ -55,39 +101,75 @@ public class TransacaoController : ControllerBase
             conta.Saldo -= transacao.Valor;
 
         _context.Transacoes.Add(transacao);
+
         await _context.SaveChangesAsync();
 
-        return CreatedAtAction(nameof(GetTransacao), new { id = transacao.Id }, transacao);
+        var response = new TransacaoResponseDTO
+        {
+            Id = transacao.Id,
+            Descricao = transacao.Descricao,
+            Valor = transacao.Valor,
+            Tipo = transacao.Tipo,
+            Data = transacao.Data,
+            ContaId = transacao.ContaId,
+            NomeConta = conta.Nome
+        };
+
+        return CreatedAtAction(nameof(GetTransacao), new { id = transacao.Id }, response);
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> PutTransacao(int id, Transacao transacao)
+    public async Task<IActionResult> PutTransacao(int id, TransacaoCreateDTO dto)
     {
-        if (id != transacao.Id)
-            return BadRequest();
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
 
         var transacaoAntiga = await _context.Transacoes.FindAsync(id);
-        if (transacaoAntiga == null)
-            return NotFound();
 
-        var conta = await _context.Contas.FindAsync(transacao.ContaId);
+        if (transacaoAntiga == null)
+        {
+            return NotFound(new
+            {
+                mensagem = "Transação não encontrada"
+            });
+        }
+
+        var conta = await _context.Contas.FindAsync(dto.ContaId);
+
         if (conta == null)
-            return BadRequest("Conta não encontrada.");
-        
+        {
+            return BadRequest(new
+            {
+                mensagem = "Conta não encontrada"
+            });
+        }
+
+        // Remove efeito antigo do saldo
         if (transacaoAntiga.Tipo == "credito")
             conta.Saldo -= transacaoAntiga.Valor;
         else if (transacaoAntiga.Tipo == "debito")
             conta.Saldo += transacaoAntiga.Valor;
-        
-        if (transacao.Tipo == "credito")
-            conta.Saldo += transacao.Valor;
-        else if (transacao.Tipo == "debito")
-            conta.Saldo -= transacao.Valor;
 
-        _context.Entry(transacaoAntiga).CurrentValues.SetValues(transacao);
+        // Aplica novo valor
+        if (dto.Tipo == "credito")
+            conta.Saldo += dto.Valor;
+        else if (dto.Tipo == "debito")
+            conta.Saldo -= dto.Valor;
+
+        transacaoAntiga.Descricao = dto.Descricao;
+        transacaoAntiga.Valor = dto.Valor;
+        transacaoAntiga.Tipo = dto.Tipo;
+        transacaoAntiga.Data = dto.Data;
+        transacaoAntiga.ContaId = dto.ContaId;
+
         await _context.SaveChangesAsync();
 
-        return NoContent();
+        return Ok(new
+        {
+            mensagem = "Transação atualizada com sucesso"
+        });
     }
 
     [HttpDelete("{id}")]
@@ -95,7 +177,10 @@ public class TransacaoController : ControllerBase
     {
         var transacao = await _context.Transacoes.FindAsync(id);
         if (transacao == null)
-            return NotFound();
+            return NotFound(new
+            {
+                mensagem = "Transação não encontrada"
+            });
 
         var conta = await _context.Contas.FindAsync(transacao.ContaId);
 
@@ -110,6 +195,9 @@ public class TransacaoController : ControllerBase
         _context.Transacoes.Remove(transacao);
         await _context.SaveChangesAsync();
 
-        return NoContent();
+        return Ok(new
+        {
+            mensagem = "Transação removida com sucesso"
+        });
     }
 }

@@ -1,8 +1,9 @@
 ﻿using GestaoFinanceira.Data;
+using GestaoFinanceira.DTOs;
 using GestaoFinanceira.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Authorization;
 
 namespace GestaoFinanceira.Controllers;
 
@@ -17,34 +18,27 @@ public class ContaController : ControllerBase
     {
         _context = context;
     }
-    
+
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<Conta>>> GetContas()
+    public async Task<ActionResult<IEnumerable<ContaResponseDTO>>> GetContas()
     {
-        return await _context.Contas
+        var contas = await _context.Contas
             .Include(c => c.Usuario)
+            .Select(c => new ContaResponseDTO
+            {
+                Id = c.Id,
+                Nome = c.Nome,
+                Saldo = c.Saldo,
+                UsuarioId = c.UsuarioId,
+                NomeUsuario = c.Usuario.Nome
+            })
             .ToListAsync();
+
+        return Ok(contas);
     }
-    
-    [HttpPost]
-    public async Task<ActionResult<Conta>> PostConta(Conta conta)
-    {
-        var usuario = await _context.Usuarios.FindAsync(conta.UsuarioId);
 
-        if (usuario == null)
-        {
-            return BadRequest("Usuário não encontrado.");
-        }
-
-        _context.Contas.Add(conta);
-
-        await _context.SaveChangesAsync();
-
-        return CreatedAtAction(nameof(GetContas), new { id = conta.Id }, conta);
-    }
-    
     [HttpGet("{id}")]
-    public async Task<ActionResult<Conta>> GetConta(int id)
+    public async Task<ActionResult<ContaResponseDTO>> GetConta(int id)
     {
         var conta = await _context.Contas
             .Include(c => c.Usuario)
@@ -52,34 +46,105 @@ public class ContaController : ControllerBase
 
         if (conta == null)
         {
-            return NotFound();
+            return NotFound(new
+            {
+                mensagem = "Conta não encontrada"
+            });
         }
 
-        return conta;
-    }
-    
-    [HttpPut("{id}")]
-    public async Task<IActionResult> PutConta(int id, Conta conta)
-    {
-        if (id != conta.Id)
+        var response = new ContaResponseDTO
         {
-            return BadRequest();
+            Id = conta.Id,
+            Nome = conta.Nome,
+            Saldo = conta.Saldo,
+            UsuarioId = conta.UsuarioId,
+            NomeUsuario = conta.Usuario.Nome
+        };
+
+        return Ok(response);
+    }
+
+    [HttpPost]
+    public async Task<ActionResult> PostConta(ContaCreateDTO dto)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
         }
 
-        var usuario = await _context.Usuarios.FindAsync(conta.UsuarioId);
+        var usuario = await _context.Usuarios.FindAsync(dto.UsuarioId);
 
         if (usuario == null)
         {
-            return BadRequest("Usuário não encontrado.");
+            return BadRequest(new
+            {
+                mensagem = "Usuário não encontrado"
+            });
         }
 
-        _context.Entry(conta).State = EntityState.Modified;
+        var conta = new Conta
+        {
+            Nome = dto.Nome,
+            Saldo = dto.Saldo,
+            UsuarioId = dto.UsuarioId
+        };
+
+        _context.Contas.Add(conta);
 
         await _context.SaveChangesAsync();
 
-        return NoContent();
+        var response = new ContaResponseDTO
+        {
+            Id = conta.Id,
+            Nome = conta.Nome,
+            Saldo = conta.Saldo,
+            UsuarioId = conta.UsuarioId,
+            NomeUsuario = usuario.Nome
+        };
+
+        return CreatedAtAction(nameof(GetConta), new { id = conta.Id }, response);
     }
-    
+
+    [HttpPut("{id}")]
+    public async Task<IActionResult> PutConta(int id, ContaCreateDTO dto)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var conta = await _context.Contas.FindAsync(id);
+
+        if (conta == null)
+        {
+            return NotFound(new
+            {
+                mensagem = "Conta não encontrada"
+            });
+        }
+
+        var usuario = await _context.Usuarios.FindAsync(dto.UsuarioId);
+
+        if (usuario == null)
+        {
+            return BadRequest(new
+            {
+                mensagem = "Usuário não encontrado"
+            });
+        }
+
+        conta.Nome = dto.Nome;
+        conta.Saldo = dto.Saldo;
+        conta.UsuarioId = dto.UsuarioId;
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new
+        {
+            mensagem = "Conta atualizada com sucesso"
+        });
+    }
+
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteConta(int id)
     {
@@ -87,13 +152,19 @@ public class ContaController : ControllerBase
 
         if (conta == null)
         {
-            return NotFound();
+            return NotFound(new
+            {
+                mensagem = "Conta não encontrada"
+            });
         }
 
         _context.Contas.Remove(conta);
 
         await _context.SaveChangesAsync();
 
-        return NoContent();
+        return Ok(new
+        {
+            mensagem = "Conta removida com sucesso"
+        });
     }
 }
